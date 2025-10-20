@@ -14,7 +14,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Check // <-- Pastikan import Check ada
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -33,11 +33,14 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+import androidx.navigation.compose.rememberNavController
+import com.example.shoppinglist.navigation.Screen
 import com.example.shoppinglist.ui.theme.ShoppingListTheme
 import kotlinx.coroutines.delay
 
 @Composable
-fun ShoppingList(items: List<String>) {
+fun ShoppingList(items: List<String>, navController: NavController) {
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -46,16 +49,15 @@ fun ShoppingList(items: List<String>) {
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(items, key = { it }) { item ->
-            AnimatedShoppingListItem(item = item)
+            AnimatedShoppingListItem(item = item, navController = navController)
         }
     }
 }
 
 @Composable
-fun AnimatedShoppingListItem(item: String) {
+fun AnimatedShoppingListItem(item: String, navController: NavController) {
     var isVisible by remember { mutableStateOf(false) }
 
-    // Trigger animasi saat item pertama kali muncul
     LaunchedEffect(item) {
         delay(100)
         isVisible = true
@@ -66,16 +68,17 @@ fun AnimatedShoppingListItem(item: String) {
         enter = fadeIn(animationSpec = tween(600)) +
                 expandVertically(animationSpec = tween(600))
     ) {
-        ShoppingListItem(item)
+        ShoppingListItem(item, navController = navController)
     }
 }
 
 @Composable
-fun ShoppingListItem(item: String) {
+fun ShoppingListItem(item: String, navController: NavController) {
+    // <-- KEMBALIKAN isSelected DAN isPressed -->
     var isSelected by remember { mutableStateOf(false) }
     var isPressed by remember { mutableStateOf(false) }
 
-    // Animasi warna
+    // <-- KEMBALIKAN LOGIKA 'isSelected' UNTUK WARNA -->
     val backgroundColor by animateColorAsState(
         targetValue = if (isSelected) {
             MaterialTheme.colorScheme.primaryContainer
@@ -98,7 +101,6 @@ fun ShoppingListItem(item: String) {
         label = "contentColor"
     )
 
-    // Animasi elevasi
     val elevation by animateDpAsState(
         targetValue = if (isPressed) 12.dp else if (isSelected) 8.dp else 4.dp,
         animationSpec = tween(200),
@@ -112,10 +114,8 @@ fun ShoppingListItem(item: String) {
                 elevation = elevation,
                 shape = RoundedCornerShape(16.dp),
                 clip = false
-            )
-            .clickable {
-                isSelected = !isSelected
-            },
+            ),
+        // <-- PENTING: HAPUS .clickable{} DARI SINI -->
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = backgroundColor,
@@ -124,6 +124,7 @@ fun ShoppingListItem(item: String) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         border = androidx.compose.foundation.BorderStroke(
             width = 1.dp,
+            // <-- KEMBALIKAN LOGIKA 'isSelected' UNTUK BORDER -->
             color = if (isSelected) {
                 MaterialTheme.colorScheme.primary.copy(alpha = 0.3f)
             } else {
@@ -142,6 +143,7 @@ fun ShoppingListItem(item: String) {
                 modifier = Modifier
                     .size(36.dp)
                     .shadow(2.dp, shape = RoundedCornerShape(50))
+                    // <-- KEMBALIKAN LOGIKA 'isSelected' UNTUK BACKGROUND BOX -->
                     .background(
                         color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer,
                         shape = RoundedCornerShape(50)
@@ -151,22 +153,34 @@ fun ShoppingListItem(item: String) {
                 Text(
                     text = item.firstOrNull()?.uppercase() ?: "?",
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                    // <-- KEMBALIKAN LOGIKA 'isSelected' UNTUK WARNA TEKS -->
                     color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
                 )
             }
 
-            // Nama item
+            // Nama item (Sekarang area ini yang bisa diklik untuk navigasi)
             Text(
                 text = item,
                 style = MaterialTheme.typography.titleMedium,
                 color = contentColor,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier
+                    .weight(1f)
+                    // <-- TAMBAHKAN CLICKABLE UNTUK NAVIGASI DI SINI -->
+                    .clickable {
+                        navController.navigate(Screen.ItemDetail.createRoute(item))
+                    }
             )
 
-            // Icon status
+            // Icon status (Ikon ini yang bisa diklik untuk centang)
             Surface(
-                modifier = Modifier.size(32.dp),
+                modifier = Modifier
+                    .size(32.dp)
+                    // <-- TAMBAHKAN CLICKABLE UNTUK CENTANG DI SINI -->
+                    .clickable {
+                        isSelected = !isSelected
+                    },
                 shape = RoundedCornerShape(8.dp),
+                // <-- KEMBALIKAN LOGIKA 'isSelected' UNTUK WARNA IKON -->
                 color = if (isSelected) {
                     MaterialTheme.colorScheme.primary
                 } else {
@@ -174,6 +188,7 @@ fun ShoppingListItem(item: String) {
                 }
             ) {
                 Icon(
+                    // <-- KEMBALIKAN LOGIKA 'isSelected' UNTUK IKON CHECK/ADD -->
                     imageVector = if (isSelected) Icons.Default.Check else Icons.Default.Add,
                     contentDescription = if (isSelected) "Selected" else "Add to cart",
                     tint = if (isSelected) {
@@ -196,7 +211,12 @@ fun ShoppingListPreview() {
             modifier = Modifier.fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
-            ShoppingList(items = listOf("Susu Segar", "Roti Tawar", "Telur Ayam", "Apel Fuji", "Daging Sapi"))
+            // Kita perlu NavController dummy untuk preview
+            val navController = rememberNavController()
+            ShoppingList(
+                items = listOf("Susu Segar", "Roti Tawar", "Telur Ayam", "Apel Fuji", "Daging Sapi"),
+                navController = navController
+            )
         }
     }
 }
